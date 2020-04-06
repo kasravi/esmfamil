@@ -50,6 +50,7 @@ io.on('connection', function (socket) {
     restartRequest[socket.id]=true;
     if(Object.keys(restartRequest).length>=players.length){
       restartRequest={};
+      kalkal = {};
       players.forEach(f=>f.entities = fields.reduce((a, c) => { a[c] = ""; return a }, {}));
       io.emit('restart');
     }
