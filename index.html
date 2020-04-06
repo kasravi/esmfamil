@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>اسم فامیل</title>
+    <style>
+        .chat-box {
+            padding-top: 10px;
+        }
+
+        .title {
+            margin-bottom: 20px;
+        }
+
+        th:first-child,
+        td:first-child {
+            position: sticky;
+            left: 0px;
+        }
+
+        .kalkal {
+            background-color: yellow;
+        }
+    </style>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css"
+        integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
+</head>
+
+<body class="container">
+    <div id="app" class="text-center">
+        <div v-if="state!=='intro'" class="chat-box">
+            <div class="input-group mb-3">
+                <input type="text" class="form-control" placeholder="پیام" id="chat" v-model="userchat">
+                <div class="input-group-append">
+                    <button class="btn btn-outline-secondary" onclick="chat()" type="button">بفرست</button>
+                </div>
+            </div>
+            <p>{{chat}}</p>
+        </div>
+
+        <div v-if="state==='intro'">
+            <div style="margin-top: 50px;" class="title">
+                <h3>اسمت رو می گی</h3>
+            </div>
+            <div>
+                <div class="input-group mb-3">
+                    <input type="text" id="username" v-model="username"  
+                        class="form-control" 
+                        autocomplete="off">
+                    <div class="input-group-append">
+                        <span class="input-group-text">اسم</span>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <button type="button" class="btn btn-primary"
+                onclick="submitPlayer()">بزن بریم</button>
+            </div>
+        </div>
+        <div v-else-if="state==='waiting'">
+            <h3>اینا تا حالا اومدن</h3>
+            <p>
+                {{players.map(f=>f.name).join(' و ')}}
+            </p>
+            <div>
+                <button type="button" class="btn btn-primary" onclick="start()">بریم؟</button>
+            </div>
+            <div>
+                <button type="button" class="btn btn-link" onclick="reintro()">شما یکی دیگه ای؟</button>
+            </div>
+            </span>
+        </div>
+        <div v-else-if="state==='select'">
+            <div class="title">
+                <h3>یه حرف انتخاب کن!</h3>
+            </div>
+            <div>
+                <div class="input-group mb-3">
+                    <input type="text" id="letter" v-model="letter" class="form-control" placeholder="مثلاً ن"
+                        autocomplete="off">
+                    <div class="input-group-append">
+                        <span class="input-group-text">حرف</span>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <button type="button" class="btn btn-primary" :disabled="waitforothers"
+                    onclick="letterSelection()">{{buttonText}}</button>
+            </div>
+            <p>{{currentGame.letters.join(',')}}</p>
+        </div>
+        <div v-else-if="state==='game'">
+            <h2 class='title'>حرف {{currentGame.goal}}</h2>
+            <form v-on:submit.prevent="hop">
+                <div class="input-group mb-3" v-for="entity in Object.keys(entities)">
+                    <input type="text" :id="entity" v-model="entities[entity]" class="form-control"
+                        :class="{'is-invalid': errors[entity]}" value="" autocomplete="off">
+                    <div class="input-group-append">
+                        <span class="input-group-text">{{entity}}</span>
+                    </div>
+                </div>
+                <button class="btn btn-primary" type="submit">هپ!</button>
+            </form>
+        </div>
+        <div v-else-if="state==='results'">
+            <div class="table-responsive-xl">
+                <table class="table table-striped">
+                    <tr>
+                        <th v-for="field in ['', 'امتیاز دست','امتیاز بازی' , ...currentGame.fields]">{{field}}</th>
+                    </tr>
+                    <tr v-for="player in orderedplayers">
+                        <th>{{player.name}}</th>
+                        <th>{{player.currentScore}}</th>
+                        <th>{{player.overall}}</th>
+                        <th v-for="(entity,name) in player.entities" v-on:click="kalkal(player.id,name)"
+                            :class="{'kalkal': kalkalObj[player.id+name]}">{{entity}}</th>
+                    </tr>
+                </table>
+            </div>
+            <div>
+                <button type="button" class="btn btn-primary" onclick="restartGame()">{{buttonText}}</button>
+            </div>
+        </div>
+
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        var fields = ['اسم', 'فامیل', 'اشیا', 'شغل', 'شهر', 'کشور','ماشین','میوه','حیوان','رنگ','غذا','گل'];
+        var socket = io();
+        var chatDom = document.getElementById('chat');
+        var letterbtn = document.getElementById('letterbtn');
+
+        function getCookie(name) {
+            var v = document.cookie.match('(^|;) ?' + name + '=([^;]*)(;|$)');
+            return v ? v[2] : null;
+        }
+        function setCookie(name, value, days) {
+            var d = new Date;
+            d.setTime(d.getTime() + 24 * 60 * 60 * 1000 * days);
+            document.cookie = name + "=" + value + ";path=/;expires=" + d.toGMTString();
+        }
+        var app = new Vue({
+            el: '#app',
+            data: {
+                state: "intro",
+                username: null,
+                players: [],
+                chat: "",
+                userchat: "",
+                userId: null,
+                letter: "",
+                errors: [],
+                buttonText: 'بریم؟',
+                kalkalObj: {},
+                entities: fields.reduce((a, c) => { a[c] = ""; return a }, {}),
+                currentGame: {
+                    goal: '',
+                    letters: [],
+                    fields
+                }
+            }, methods: {
+                hop: hop,
+                kalkal: kalkal
+            }, watch: {
+                entities: {
+                    deep: true,
+                    handler(val) {
+                        changeField(val);
+                    }
+                }
+            }, computed: {
+                orderedplayers: function () {
+                    return this.players.sort((a, b) => a.overall > b.overall ? -1 : 1)
+                }
+            }
+        })
+
+        function submitPlayer() {
+            setCookie('username', app.username, 100);
+            socket.emit('addPlayer', app.username, fields);
+            app.state = 'waiting';
+        }
+        function start() {
+            app.waitforothers = false;
+            app.state = "select";
+        }
+        function letterSelection() {
+            if (app.letter && app.letter !== "") {
+                app.waitforothers = true;
+                app.buttonText = "منتظر بقیه واسا"
+                socket.emit('letterSelection', app.letter);
+            }else{
+                app.buttonText = "یه حرف انتخاب کن دیگه"
+            }
+        }
+        function chat() {
+            socket.emit('chat', app.userchat);
+        }
+        function hop() {
+            var errors = {}
+            Object.entries(app.entities).forEach(f => {
+                if (f[1] === "" || f[1].indexOf(app.currentGame.goal) !== 0) {
+                    errors[f[0]] = true;
+                }
+            })
+            app.errors = errors;
+            if (Object.values(errors).length === 0) {
+                socket.emit('hop');
+            }
+        }
+        function kalkal(id, e) {
+            socket.emit('kalkal', id, e);
+        }
+        function changeField(e) {
+            Object.keys(e).forEach(k => {
+                var v = e[k];
+                if (v !== "" && v.indexOf(app.currentGame.goal) !== 0) {
+                    app.errors[k] = true;
+                    return;
+                }
+                app.errors[k] = false;
+                socket.emit('changeField', k, v);
+            })
+        }
+        function restartGame() {
+            socket.emit('restart', fields);
+            app.buttonText = "منتظر بقیه واسا"
+        }
+        socket.on('restart', function () {
+            app.state = 'select';
+            app.waitforothers = false;
+            app.currentGame.letters = [];
+            app.currentGame.goal = null;
+            app.letter = null;
+            app.buttonText = "بریم؟";
+            app.entities = fields.reduce((a, c) => { a[c] = ''; return a }, {});
+            app.errors = [];
+        })
+        socket.on('kalkal', function (val) {
+            app.kalkalObj = val;
+        })
+        socket.on('updateScores', function (val) {
+            app.players = val;
+        })
+        socket.on('hop', function (id, val) {
+            app.players = val;
+            app.state = "results"
+            app.buttonText = "بریم دست بعد؟"
+        })
+        socket.on('letterSelection', function (id, msg) {
+            app.currentGame.letters = msg;
+            app.players.find(f => f.id === id).currentScore = 0;
+        });
+        socket.on('gameStart', function (id, msg) {
+            app.currentGame.goal = msg;
+            app.state = "game";
+        });
+        socket.on('chat', function (id, msg) {
+            app.chat = app.players.filter(f => f.id === id)[0].name + ":" + msg;
+        });
+        socket.on('addPlayer', function (id, name) {
+            if (app.players.some(f => f.id === id)) return;
+            app.players.push({ id, name, overall: 0, entities: fields.reduce((a, c) => { a[c] = ''; return a }, {}) });
+        });
+        socket.on('removePlayer', function (val) {
+            app.players = app.players.filter(player => player.id !== val);
+        });
+
+        function reintro() {
+            document.cookie = 'username=; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+            location.reload();
+        }
+        if (getCookie('username')) {
+            app.username = getCookie('username');
+            submitPlayer();
+        }
+        // start();
+        // app.letter = "ز";
+        // letterSelection();
+        // app.entities['اسم']="ز";
+        // hop();
+        // restartGame();
+        // app.letter = "ز";
+        // letterSelection();
+    </script>
+</body>
+
+</html>
