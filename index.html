@@ -102,6 +102,7 @@
                     </div>
                 </div>
                 <button class="btn btn-primary" type="submit">هپ!</button>
+                <button class="btn btn-primary" type="button" onclick="draw()">{{drawText}}</button>
             </form>
         </div>
         <div v-else-if="state==='results'">
@@ -154,6 +155,7 @@
                 letter: "",
                 errors: [],
                 buttonText: 'بریم؟',
+                drawText: 'بی خیال شیم؟',
                 kalkalObj: {},
                 entities: fields.reduce((a, c) => { a[c] = ""; return a }, {}),
                 currentGame: {
@@ -200,6 +202,10 @@
             socket.emit('chat', app.userchat);
             app.userchat=null;
         }
+        function draw() {
+            socket.emit('draw');
+            app.drawText='صب کن بقیه هم بی خیال شن';
+        }
         function hop() {
             var errors = {}
             Object.entries(app.entities).forEach(f => {
@@ -237,6 +243,7 @@
             app.currentGame.goal = null;
             app.letter = null;
             app.buttonText = "بریم؟";
+            app.drawText= 'بی خیال شیم؟';
             app.kalkalObj={};
             app.entities = fields.reduce((a, c) => { a[c] = ''; return a }, {});
             app.errors = [];

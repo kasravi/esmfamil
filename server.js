@@ -12,6 +12,30 @@ let players = [];
 let kalkal = {};
 let interval = null;
 let restartRequest = {};
+let draw={};
+function calculate(){
+  letters = [];
+    var entityByFieldandValue = {};
+    players.forEach(player => {
+      Object.entries(player.entities).forEach(e => {
+        k = e[0];
+        v = e[1];
+        if (!entityByFieldandValue[k + v]) entityByFieldandValue[k + v] = 0;
+        entityByFieldandValue[k + v]++;
+      })
+    })
+    players.forEach(player => {
+      player.currentScore = Object.values(player.entities).filter(f => f !== "").length * 10;
+      Object.entries(player.entities).forEach(e => {
+        k = e[0];
+        v = e[1];
+        if (entityByFieldandValue[k + v] > 1 && v != "") {
+          player.currentScore -= 5;
+        }
+      })
+      player.overall += player.currentScore;
+    });
+}
 
 io.on('connection', function (socket) {
   socket.on('addPlayer', function (val, fields) {
@@ -46,11 +70,20 @@ io.on('connection', function (socket) {
       }
     }
   })
+  socket.on('draw', function(){
+    draw[socket.id]=true;
+    console.log(draw,players.length)
+    if(Object.keys(draw).length>=players.length){
+      calculate();
+      io.emit('hop', socket.id, players);
+    }
+  })
   socket.on('restart', function (fields) {
     restartRequest[socket.id]=true;
     if(Object.keys(restartRequest).length>=players.length){
       restartRequest={};
       kalkal = {};
+      draw = {};
       players.forEach(f=>f.entities = fields.reduce((a, c) => { a[c] = ""; return a }, {}));
       io.emit('restart');
     }
@@ -59,27 +92,7 @@ io.on('connection', function (socket) {
     io.emit('chat', socket.id, msg);
   });
   socket.on('hop', function () {
-    letters = [];
-    var entityByFieldandValue = {};
-    players.forEach(player => {
-      Object.entries(player.entities).forEach(e => {
-        k = e[0];
-        v = e[1];
-        if (!entityByFieldandValue[k + v]) entityByFieldandValue[k + v] = 0;
-        entityByFieldandValue[k + v]++;
-      })
-    })
-    players.forEach(player => {
-      player.currentScore = Object.values(player.entities).filter(f => f !== "").length * 10;
-      Object.entries(player.entities).forEach(e => {
-        k = e[0];
-        v = e[1];
-        if (entityByFieldandValue[k + v] > 1 && v != "") {
-          player.currentScore -= 5;
-        }
-      })
-      player.overall += player.currentScore;
-    });
+    calculate();
     io.emit('hop', socket.id, players);
   });
   socket.on('changeField', function (k, v) {
