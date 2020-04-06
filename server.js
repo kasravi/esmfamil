@@ -103,7 +103,7 @@ io.on('connection', function (socket) {
   });
   socket.on('letterSelection', function (msg) {
     clearInterval(interval);
-
+    draw={};
     letters.push(msg);
     io.emit('letterSelection', socket.id, letters);
     if (letters.length >= players.length) {
