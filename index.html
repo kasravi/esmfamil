@@ -198,6 +198,7 @@
         }
         function chat() {
             socket.emit('chat', app.userchat);
+            app.userchat=null;
         }
         function hop() {
             var errors = {}
