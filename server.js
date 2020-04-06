@@ -28,13 +28,17 @@ io.on('connection', function (socket) {
     },100)
   })
   socket.on('kalkal', function (id, e) {
+    let player = players.find(f => f.id === id);
+    if(!player || player.entities[e]===''){
+      return;
+    }
     if (!kalkal[id + e]) kalkal[id + e] = [];
     if (kalkal[id + e].indexOf(socket.id) < 0) {
       kalkal[id + e].push(socket.id);
       io.emit('kalkal', kalkal)
 
       if (kalkal[id + e].length >= (players.length - 1)) {
-        let player = players.find(f => f.id === id);
+        
         player.entities[e] = '';
         player.currentScore -= 20;
         player.overall -= 20;
