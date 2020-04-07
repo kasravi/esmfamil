@@ -277,7 +277,9 @@
             app.chat = app.players.filter(f => f.id === id)[0].name + ":" + msg;
         });
         socket.on('addPlayer', function (id, name, state, goal) {
-            app.state = state;
+            if(app.state!='intro'){
+                app.state = state;
+            }
             app.currentGame.goal = goal;
             if (app.players.some(f => f.id === id)) return;
             let player = app.players.find(f => f.name === name);
