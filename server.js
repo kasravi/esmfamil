@@ -77,7 +77,7 @@ io.on('connection', function (socket) {
       kalkal[id + e].push(socket.id);
       io.emit('kalkal', kalkal)
 
-      if (kalkal[id + e].length >= (math.floor(players.length/2) + 1)) {
+      if (kalkal[id + e].length >= (Math.floor(players.length/2) + 1)) {
         
         player.entities[e] = '';
         player.currentScore -= 20;
