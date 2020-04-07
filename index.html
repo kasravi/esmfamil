@@ -46,17 +46,14 @@
             </div>
             <div>
                 <div class="input-group mb-3">
-                    <input type="text" id="username" v-model="username"  
-                        class="form-control" 
-                        autocomplete="off">
+                    <input type="text" id="username" v-model="username" class="form-control" autocomplete="off">
                     <div class="input-group-append">
                         <span class="input-group-text">اسم</span>
                     </div>
                 </div>
             </div>
             <div>
-                <button type="button" class="btn btn-primary"
-                onclick="submitPlayer()">بزن بریم</button>
+                <button type="button" class="btn btn-primary" onclick="submitPlayer()">بزن بریم</button>
             </div>
         </div>
         <div v-else-if="state==='waiting'">
@@ -89,7 +86,13 @@
                 <button type="button" class="btn btn-primary" :disabled="waitforothers"
                     onclick="letterSelection()">{{buttonText}}</button>
             </div>
-            <p>{{currentGame.letters.join(',')}}</p>
+            <div class="mt-2">
+                <ul class="list-group">
+                    <li class="list-group-item" v-for="suggestion in currentGame.letters">{{suggestion.name}} :
+                        {{suggestion.msg}}</li>
+                </ul>
+            </div>
+
         </div>
         <div v-else-if="state==='game'">
             <h2 class='title'>حرف {{currentGame.goal}}</h2>
@@ -129,7 +132,7 @@
     <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <script>
-        var fields = ['اسم', 'فامیل', 'اشیا', 'شغل', 'شهر', 'کشور','ماشین','میوه','حیوان','رنگ','غذا','گل'];
+        var fields = ['اسم', 'فامیل', 'اشیا', 'شغل', 'شهر', 'کشور', 'ماشین', 'میوه', 'حیوان', 'رنگ', 'غذا', 'گل'];
         var socket = io();
         var chatDom = document.getElementById('chat');
         var letterbtn = document.getElementById('letterbtn');
@@ -157,6 +160,7 @@
                 buttonText: 'بریم؟',
                 drawText: 'بی خیال شیم؟',
                 kalkalObj: {},
+                waitforothers: false,
                 entities: fields.reduce((a, c) => { a[c] = ""; return a }, {}),
                 currentGame: {
                     goal: '',
@@ -187,6 +191,7 @@
         }
         function start() {
             app.waitforothers = false;
+            socket.emit('select');
             app.state = "select";
         }
         function letterSelection() {
@@ -194,17 +199,17 @@
                 app.waitforothers = true;
                 app.buttonText = "منتظر بقیه واسا"
                 socket.emit('letterSelection', app.letter);
-            }else{
+            } else {
                 app.buttonText = "یه حرف انتخاب کن دیگه"
             }
         }
         function chat() {
             socket.emit('chat', app.userchat);
-            app.userchat=null;
+            app.userchat = null;
         }
         function draw() {
             socket.emit('draw');
-            app.drawText='صب کن بقیه هم بی خیال شن';
+            app.drawText = 'صب کن بقیه هم بی خیال شن';
         }
         function hop() {
             var errors = {}
@@ -236,6 +241,7 @@
             socket.emit('restart', fields);
             app.buttonText = "منتظر بقیه واسا"
         }
+
         socket.on('restart', function () {
             app.state = 'select';
             app.waitforothers = false;
@@ -243,8 +249,8 @@
             app.currentGame.goal = null;
             app.letter = null;
             app.buttonText = "بریم؟";
-            app.drawText= 'بی خیال شیم؟';
-            app.kalkalObj={};
+            app.drawText = 'بی خیال شیم؟';
+            app.kalkalObj = {};
             app.entities = fields.reduce((a, c) => { a[c] = ''; return a }, {});
             app.errors = [];
         })
@@ -270,9 +276,16 @@
         socket.on('chat', function (id, msg) {
             app.chat = app.players.filter(f => f.id === id)[0].name + ":" + msg;
         });
-        socket.on('addPlayer', function (id, name) {
+        socket.on('addPlayer', function (id, name, state, goal) {
+            app.state = state;
+            app.currentGame.goal = goal;
             if (app.players.some(f => f.id === id)) return;
-            app.players.push({ id, name, overall: 0, entities: fields.reduce((a, c) => { a[c] = ''; return a }, {}) });
+            let player = app.players.find(f => f.name === name);
+            if (player) {
+                player.id = id;
+            } else {
+                app.players.push({ id, name, overall: 0, entities: fields.reduce((a, c) => { a[c] = ''; return a }, {}) });
+            }
         });
         socket.on('removePlayer', function (val) {
             app.players = app.players.filter(player => player.id !== val);

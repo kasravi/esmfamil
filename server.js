@@ -8,13 +8,19 @@ app.get('/', function (req, res) {
 });
 
 let letters = [];
+let lettersByName = [];
 let players = [];
 let kalkal = {};
 let interval = null;
 let restartRequest = {};
 let draw={};
+let playerLeft={};
+let state ='waiting';
+let goal = null;
+
 function calculate(){
   letters = [];
+  lettersByName = [];
     var entityByFieldandValue = {};
     players.forEach(player => {
       Object.entries(player.entities).forEach(e => {
@@ -39,15 +45,25 @@ function calculate(){
 
 io.on('connection', function (socket) {
   socket.on('addPlayer', function (val, fields) {
-    players.push({
-      id: socket.id, name: val, overall: 0,
-      entities: fields.reduce((a, c) => { a[c] = ""; return a }, {})
-    });
-    io.emit('addPlayer', socket.id, val);
+    let player = players.find(f=>f.name === val)
+    if(playerLeft[val]){
+      clearTimeout(playerLeft[val]);
+      delete playerLeft[val];
+      let player = players.find(f=>f.name === val);
+      player.id = socket.id;
+    } else if(player){
+      player.id = socket.id
+    } else {
+      players.push({
+        id: socket.id, name: val, overall: 0,
+        entities: fields.reduce((a, c) => { a[c] = ""; return a }, {})
+      });
+    }
+    io.emit('addPlayer', socket.id, val, state, goal);
     clearInterval(interval);
     interval = setInterval(()=>{
       players.forEach(f=>{
-        io.emit('addPlayer', f.id, f.name);
+        io.emit('addPlayer', f.id, f.name, state, goal);
       })
     },100)
   })
@@ -61,7 +77,7 @@ io.on('connection', function (socket) {
       kalkal[id + e].push(socket.id);
       io.emit('kalkal', kalkal)
 
-      if (kalkal[id + e].length >= (players.length - 1)) {
+      if (kalkal[id + e].length >= (players.length/2 + 1)) {
         
         player.entities[e] = '';
         player.currentScore -= 20;
@@ -76,7 +92,11 @@ io.on('connection', function (socket) {
     if(Object.keys(draw).length>=players.length){
       calculate();
       io.emit('hop', socket.id, players);
+      state = 'results';
     }
+  })
+  socket.on('select',function(){
+    state = 'select';
   })
   socket.on('restart', function (fields) {
     restartRequest[socket.id]=true;
@@ -86,6 +106,7 @@ io.on('connection', function (socket) {
       draw = {};
       players.forEach(f=>f.entities = fields.reduce((a, c) => { a[c] = ""; return a }, {}));
       io.emit('restart');
+      state = "select";
     }
   })
   socket.on('chat', function (msg) {
@@ -94,6 +115,7 @@ io.on('connection', function (socket) {
   socket.on('hop', function () {
     calculate();
     io.emit('hop', socket.id, players);
+    state = 'results';
   });
   socket.on('changeField', function (k, v) {
     let player = players.find(f => f.id === socket.id)
@@ -104,8 +126,9 @@ io.on('connection', function (socket) {
   socket.on('letterSelection', function (msg) {
     clearInterval(interval);
     draw={};
-    letters.push(msg);
-    io.emit('letterSelection', socket.id, letters);
+    lettersByName.push({name:players.find(f=>f.id === socket.id).name, msg});
+    letters.push(msg)
+    io.emit('letterSelection', socket.id, lettersByName);
     if (letters.length >= players.length) {
       let selected = letters.reduce((a, i) => {
         a[i] = a[i] ? a[i] + 1 : 1;
@@ -116,12 +139,22 @@ io.on('connection', function (socket) {
         return a;
       }, { max: -1, letter: '' })
       letters = [];
+      lettersByName = [];
       io.emit('gameStart', socket.id, selected.letter);
+      goal = selected.letter;
+      state = "game";
     }
   });
   socket.on('disconnect', function () {
-    players = players.filter(f => f.id !== socket.id);
-    io.emit('removePlayer', socket.id)
+    let player = players.find(f => f.id === socket.id);
+    if(!player) return;
+    playerLeft[player.name] = setTimeout(()=>{
+      players = players.filter(f => f.id !== socket.id);
+      io.emit('removePlayer', socket.id);
+      if(players.length===0){
+        state ='waiting';
+      }
+    },5000)
   });
 });
 
