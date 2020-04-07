@@ -151,6 +151,7 @@ io.on('connection', function (socket) {
     playerLeft[player.name] = setTimeout(()=>{
       players = players.filter(f => f.id !== socket.id);
       io.emit('removePlayer', socket.id);
+      delete playerLeft[player.name]
       if(players.length===0){
         state ='waiting';
       }
