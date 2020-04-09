@@ -96,6 +96,7 @@
         </div>
         <div v-else-if="state==='game'">
             <h2 class='title'>حرف {{currentGame.goal}}</h2>
+            <h3 class='title'>{{minLeft}}:{{secondLeft}}</h3>
             <form v-on:submit.prevent="hop">
                 <div class="input-group mb-3" v-for="entity in Object.keys(entities)">
                     <input type="text" :id="entity" v-model="entities[entity]" class="form-control"
@@ -157,6 +158,8 @@
                 userId: null,
                 letter: "",
                 errors: [],
+                minLeft:3,
+                secondLeft:0,
                 buttonText: 'بریم؟',
                 drawText: 'بی خیال شیم؟',
                 kalkalObj: {},
@@ -241,7 +244,10 @@
             socket.emit('restart', fields);
             app.buttonText = "منتظر بقیه واسا"
         }
-
+        socket.on('timeleft', function(val){
+            app.minLeft = Math.floor(parseInt(val)/60);
+            app.secondLeft = parseInt(val)%60;
+        })
         socket.on('restart', function () {
             app.state = 'select';
             app.waitforothers = false;

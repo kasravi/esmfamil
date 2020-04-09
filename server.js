@@ -17,6 +17,8 @@ let draw={};
 let playerLeft={};
 let state ='waiting';
 let goal = null;
+let timeLeft=60*3;
+let timer;
 
 function calculate(){
   letters = [];
@@ -88,8 +90,8 @@ io.on('connection', function (socket) {
   })
   socket.on('draw', function(){
     draw[socket.id]=true;
-    console.log(draw,players.length)
     if(Object.keys(draw).length>=players.length){
+      clearInterval(timer);
       calculate();
       io.emit('hop', socket.id, players);
       state = 'results';
@@ -113,6 +115,7 @@ io.on('connection', function (socket) {
     io.emit('chat', socket.id, msg);
   });
   socket.on('hop', function () {
+    clearInterval(timer);
     calculate();
     io.emit('hop', socket.id, players);
     state = 'results';
@@ -126,7 +129,10 @@ io.on('connection', function (socket) {
   socket.on('letterSelection', function (msg) {
     clearInterval(interval);
     draw={};
-    lettersByName.push({name:players.find(f=>f.id === socket.id).name, msg});
+    let player = players.find(f=>f.id === socket.id);
+    if(player){
+      lettersByName.push({name:player.name, msg});
+    }
     letters.push(msg)
     io.emit('letterSelection', socket.id, lettersByName);
     if (letters.length >= players.length) {
@@ -143,6 +149,19 @@ io.on('connection', function (socket) {
       io.emit('gameStart', socket.id, selected.letter);
       goal = selected.letter;
       state = "game";
+      timeLeft = 60*3;
+      timer = setInterval(()=>{
+        timeLeft--;
+        io.emit('timeleft',timeLeft)
+        console.log('aaaaaaaaa')
+        if(timeLeft<0){
+          clearInterval(timer);
+          delete timer;
+          calculate();
+          io.emit('hop', socket.id, players);
+          state = 'results';
+        }
+      },1000)
     }
   });
   socket.on('disconnect', function () {
